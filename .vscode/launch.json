@@ -1,0 +1,73 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Agent TARS: Run (test-workspace)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/multimodal/agent-tars/cli/bin/cli.js",
+      "cwd": "${workspaceFolder}/multimodal/agent-tars/test-workspace",
+      "args": [
+        "--config",
+        "${workspaceFolder}/multimodal/agent-tars/test-workspace/agent-tars.config.ts"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "${env:GEMINI_API_KEY}",
+        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
+        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}"
+      },
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/multimodal/**/dist/**/*.js"
+      ],
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Debug Agent TARS CLI (Custom config)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/multimodal/agent-tars/cli/bin/cli.js",
+      "cwd": "${workspaceFolder}/multimodal",
+      "args": [
+        "--config",
+        "${input:agentTarsConfig}"
+      ],
+      "env": {
+        "NODE_ENV": "development",
+        "GEMINI_API_KEY": "${env:GEMINI_API_KEY}",
+        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
+        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}"
+      },
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/multimodal/**/dist/**/*.js"
+      ],
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**"
+      ]
+    },
+    {
+      "name": "Attach to Node",
+      "type": "node",
+      "request": "attach",
+      "processId": "${command:PickProcess}",
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**"
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "agentTarsConfig",
+      "type": "promptString",
+      "description": "Path to agent-tars config file",
+      "default": "c:/temp/tars/gemini-config.json"
+    }
+  ]
+}

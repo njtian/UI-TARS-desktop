@@ -98,6 +98,35 @@ export class LLMCompletions {
     body: CompletionBase<P>,
   ): Promise<CompletionResponse | StreamCompletionResponse>;
   create(body: CompletionParams): Promise<CompletionResponse | StreamCompletionResponse> {
+    // 多API-Key轮询逻辑
+    const anySelf = this as any;
+    const rawKey = this.opts.apiKey;
+
+    // 初始化检查：如果是多密钥且未初始化
+    if (typeof rawKey === 'string' && rawKey.includes(',') && !anySelf.__apiKeys) {
+      anySelf.__apiKeys = rawKey
+        .split(',')
+        .map((k: string) => k.trim())
+        .filter(Boolean);
+      anySelf.__apiKeyIndex = 0;
+      anySelf.__originalApiKey = rawKey; // 保存原始的多密钥字符串
+      console.log(
+        `[LLMCompletions] 初始化多API-Key轮询，共加载 ${anySelf.__apiKeys.length} 个密钥`,
+      );
+    }
+
+    // 轮询检查：如果已初始化且有有效密钥
+    if (anySelf.__apiKeys && anySelf.__apiKeys.length > 0) {
+      const currentKeyIndex = anySelf.__apiKeyIndex;
+      const currentKey = anySelf.__apiKeys[currentKeyIndex];
+      // secretlint-disable-next-line
+      this.opts.apiKey = currentKey;
+      anySelf.__apiKeyIndex = (anySelf.__apiKeyIndex + 1) % anySelf.__apiKeys.length;
+      console.log(
+        `[LLMCompletions] 切换到API-Key [${currentKeyIndex + 1}/${anySelf.__apiKeys.length}]: ${currentKey.substring(0, 8)}...`,
+      );
+    }
+
     const handler = getHandler(body.provider, this.opts);
     return handler.create(body);
   }

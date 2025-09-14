@@ -159,7 +159,21 @@ export const convertMessageToContent = async (
           {
             functionResponse: {
               name: message.tool_call_id,
-              response: JSON.parse(convertMessageContentToString(message.content)),
+              // Gemini expects `response` to be a JSON object (Struct),
+              // not an array or primitive. Wrap non-object payloads.
+              response: (() => {
+                try {
+                  const parsed = JSON.parse(convertMessageContentToString(message.content));
+                  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    return parsed;
+                  }
+                  // Wrap arrays or primitives to satisfy Struct requirement
+                  return { result: parsed };
+                } catch (_) {
+                  // If not valid JSON, pass as string under result
+                  return { result: String(convertMessageContentToString(message.content)) };
+                }
+              })(),
             },
           },
         ],
@@ -346,6 +360,36 @@ export const convertToolConfig = (
   }
 };
 
+/**
+ * Clean JSON Schema object to be compatible with Gemini API
+ * Removes fields that Gemini doesn't support: $schema, additionalProperties
+ */
+const cleanJsonSchemaForGemini = (schema: any): any => {
+  if (typeof schema !== 'object' || schema === null) {
+    return schema;
+  }
+
+  if (Array.isArray(schema)) {
+    return schema.map(cleanJsonSchemaForGemini);
+  }
+
+  const cleanedSchema: any = {};
+  for (const [key, value] of Object.entries(schema)) {
+    // Skip Gemini-incompatible fields
+    if (key === '$schema') {
+      continue;
+    }
+    if (key === 'additionalProperties' && value === false) {
+      continue;
+    }
+
+    // Recursively clean nested objects
+    cleanedSchema[key] = cleanJsonSchemaForGemini(value);
+  }
+
+  return cleanedSchema;
+};
+
 export const convertTools = (
   tools: OpenAI.Chat.Completions.ChatCompletionTool[] | undefined,
 ): Tool[] | undefined => {
@@ -354,14 +398,16 @@ export const convertTools = (
   }
 
   return tools.map((tool) => {
+    // Clean the parameters to remove Gemini-incompatible JSON Schema fields
+    const cleanParameters = cleanJsonSchemaForGemini(tool.function.parameters);
+
     return {
       functionDeclarations: [
         {
           name: tool.function.name,
           description: tool.function.description,
-          // We can cast this directly to Google's type because they both use JSON Schema
-          // OpenAI just uses a generic Record<string, unknown> type for this.
-          parameters: tool.function.parameters as any as FunctionDeclarationSchema,
+          // Use cleaned parameters compatible with Gemini's function declaration schema
+          parameters: cleanParameters as any as FunctionDeclarationSchema,
         },
       ],
     };
@@ -437,7 +483,9 @@ export class GeminiHandler extends BaseHandler<GeminiModel> {
   ): Promise<CompletionResponse | StreamCompletionResponse> {
     this.validateInputs(body);
 
+    // secretlint-disable-next-line
     const apiKey = this.opts.apiKey ?? process.env.GEMINI_API_KEY;
+    // secretlint-disable-next-line
     if (apiKey === undefined) {
       throw new InputError(
         'API key is required for Gemini, define GEMINI_API_KEY in your environment or specifty the apiKey option.',
