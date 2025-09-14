@@ -1,0 +1,25 @@
+{
+  "name": "gui-agent-helloworld",
+  "version": "1.0.0",
+  "description": "Hello World example for multimodal gui-agent with Gemini 2.5 Flash",
+  "type": "module",
+  "scripts": {
+    "demo:computer": "tsx basic-computer.ts",
+    "demo:browser": "tsx basic-browser.ts",
+    "dev": "tsx --watch basic-computer.ts",
+    "start": "npx @agent-tars/cli --config=tarko.config.ts",
+    "start:computer": "npx @agent-tars/cli --config=tarko.config.ts --operatorType=computer",
+    "start:browser": "npx @agent-tars/cli --config=tarko.config.ts --operatorType=browser"
+  },
+  "dependencies": {
+    "@multimodal/seed-gui-agent": "workspace:*",
+    "@tarko/core": "workspace:*",
+    "@tarko/agent": "workspace:*",
+    "@tarko/agent-cli": "workspace:*",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.2"
+  }
+}
