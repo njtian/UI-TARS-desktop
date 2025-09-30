@@ -10,7 +10,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { execa } from 'execa';
-import semver from 'semver';
 
 import { resolveWorkspaceConfig } from '../utils/workspace';
 import { gitCommit, gitPush, getCommitAuthorMap } from '../utils/git';
@@ -19,6 +18,7 @@ import { AIChangelogGenerator } from '../utils/ai-changelog';
 
 import type { ChangelogOptions, CommitAuthor, ChangelogSection } from '../types';
 import type { GitCommit, Reference } from 'tiny-conventional-commits-parser';
+import { ModelProviderName } from '@tarko/model-provider';
 
 /**
  * Filters commits based on configured filters
@@ -65,6 +65,7 @@ async function getRepositoryUrl(cwd: string): Promise<string> {
 
 /**
  * Gets the previous tag based on chronological order (handles mixed tag formats)
+ * Filters out canary releases
  */
 async function getPreviousTag(
   version: string,
@@ -86,29 +87,40 @@ async function getPreviousTag(
       return undefined;
     }
 
-    // Find the current tag in the list (could be v{version} or any format)
+    // Filter out canary releases
+    const nonCanaryTags = allTags.filter((tag) => !tag.includes('canary'));
+    
+    logger.info(`📋 Found ${nonCanaryTags.length} non-canary tags`);
+    logger.info(`🏷️  Recent non-canary tags: [${nonCanaryTags.slice(0, 5).join(', ')}]`);
+
+    if (nonCanaryTags.length === 0) {
+      logger.warn(`❌ No non-canary git tags found`);
+      return undefined;
+    }
+
+    // Find the current tag in the filtered list (could be v{version} or any format)
     const currentTag = `${tagPrefix}${version}`;
-    const currentIndex = allTags.findIndex((tag) => tag === currentTag);
+    const currentIndex = nonCanaryTags.findIndex((tag) => tag === currentTag);
 
     logger.info(`🔍 Looking for current tag: ${currentTag}`);
-    logger.info(`📍 Current tag index: ${currentIndex}`);
+    logger.info(`📍 Current tag index in non-canary list: ${currentIndex}`);
 
     if (currentIndex === -1) {
-      // If current tag not found, return the most recent tag
-      const selected = allTags[0];
-      logger.info(`✅ Current tag not found, using most recent tag: ${selected}`);
+      // If current tag not found, return the most recent non-canary tag
+      const selected = nonCanaryTags[0];
+      logger.info(`✅ Current tag not found, using most recent non-canary tag: ${selected}`);
       return selected;
     }
 
     // Return the next tag (previous in chronological order)
-    if (currentIndex < allTags.length - 1) {
-      const selected = allTags[currentIndex + 1];
-      logger.info(`✅ Found previous tag: ${selected}`);
+    if (currentIndex < nonCanaryTags.length - 1) {
+      const selected = nonCanaryTags[currentIndex + 1];
+      logger.info(`✅ Found previous non-canary tag: ${selected}`);
       return selected;
     }
 
     // No previous tag found
-    logger.warn(`❌ No previous tag found for ${currentTag}`);
+    logger.warn(`❌ No previous non-canary tag found for ${currentTag}`);
     return undefined;
   } catch (error) {
     logger.error(`💥 Failed to get previous tag: ${(error as Error).message}`);
@@ -359,8 +371,8 @@ export async function changelog(options: ChangelogOptions = {}): Promise<void> {
   if (useAi) {
     logger.info(`Generating changelog for ${version} using AI...`);
     const generator = new AIChangelogGenerator(cwd, tagPrefix, {
-      provider,
-      model,
+      provider: provider as ModelProviderName,
+      id: model,
       apiKey,
       baseURL,
     });

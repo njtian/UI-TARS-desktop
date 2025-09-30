@@ -1,14 +1,60 @@
 /**
  * Shared configuration utilities for accessing dynamic web UI config
+ * Enhanced to support multiple configuration sources with fallback strategy
  */
 
+import { extractActualBasename } from '@tarko/shared-utils';
+import { loadWebUIConfigSync } from './config-loader';
+import type { BaseAgentWebUIImplementation } from '@tarko/interface';
+import { ENV_CONFIG } from '@/common/constants';
+
 /**
- * Get web UI configuration from global window object
- * This config is injected by the server at runtime
+ * Get Agent UI Configuration with enhanced multi-source loading
  */
-export function getWebUIConfig() {
-  return window.AGENT_WEB_UI_CONFIG || {};
+export function getWebUIConfig(): BaseAgentWebUIImplementation {
+  const result = loadWebUIConfigSync();
+  return result.config;
 }
+
+/**
+ * Get Agent UI Configuration with enhanced multi-source loading
+ */
+export function getWebUIRouteBase(): string {
+  // Extract actual basename from current URL using shared utility
+  const currentPath = window.location.pathname;
+  const config = getWebUIConfig();
+  const actualBasename = extractActualBasename(config.base, currentPath);
+  console.log('[Agent UI] base config:', config.base);
+  console.log('[Agent UI] current path:', currentPath);
+  console.log('[Agent UI] extracted basename:', actualBasename);
+  return actualBasename;
+}
+
+/**
+ * Get API Base URL.
+ */
+export function getAPIBaseUrl() {
+  const configuredBaseUrl = ENV_CONFIG.AGENT_BASE_URL ?? window.AGENT_BASE_URL;
+  /**
+   * Scene 1. The Agent Server and Agent UI are deployed together ()
+   * If routeBase exists, we should respect it
+   */
+  if (configuredBaseUrl === '') {
+    const routeBase = getWebUIRouteBase();
+    if (routeBase) {
+      return configuredBaseUrl + routeBase;
+    }
+    return configuredBaseUrl;
+  }
+
+  /**
+   * Scene 1. The Agent Server and Agent UI are deployed in different locations
+   * We should directly respect the API Base URL
+   */
+  return configuredBaseUrl;
+}
+
+export const API_BASE_URL = getAPIBaseUrl();
 
 /**
  * Get agent title from web UI config with fallback
@@ -37,8 +83,16 @@ export function getLogoUrl(): string {
 /**
  * Get workspace navigation items from web UI config
  */
-export function getWorkspaceNavItems() {
-  return getWebUIConfig().workspace?.navItems || [];
+export function getWorkspaceNavItems(prefix?: string) {
+  const items = getWebUIConfig().workspace?.navItems || [];
+
+  if(prefix) {
+      items.forEach(item => {
+        item.link = item.link.replace('{prefix}', prefix);
+      });
+  }
+
+  return items;
 }
 
 /**
@@ -63,6 +117,8 @@ export function getLayoutConfig() {
     getWebUIConfig().layout || {
       defaultLayout: 'default',
       enableLayoutSwitchButton: false,
+      enableSidebar: true,
+      enableHome: true,
     }
   );
 }
@@ -79,4 +135,18 @@ export function isLayoutSwitchButtonEnabled(): boolean {
  */
 export function getDefaultLayoutMode() {
   return getLayoutConfig().defaultLayout || 'default';
+}
+
+/**
+ * Check if sidebar is enabled
+ */
+export function isSidebarEnabled(): boolean {
+  return getLayoutConfig().enableSidebar ?? true;
+}
+
+/**
+ * Check if home route is enabled
+ */
+export function isHomeEnabled(): boolean {
+  return getLayoutConfig().enableHome ?? true;
 }

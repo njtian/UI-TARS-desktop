@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StandardPanelContent } from '../types/panelContent';
 import { motion } from 'framer-motion';
 import { FiPlay, FiCode, FiTerminal } from 'react-icons/fi';
-import { CodeEditor } from '@/sdk/code-editor';
+import { CodeEditor } from '@tarko/ui';
 import { TerminalOutput } from '../components/TerminalOutput';
 import { FileDisplayMode } from '../types';
 
@@ -30,6 +30,9 @@ const LANGUAGE_EXTENSIONS: Record<string, string> = {
   javascript: 'js',
   typescript: 'ts',
   python: 'py',
+  bash: 'sh',
+  sh: 'sh',
+  text: 'txt',
 };
 
 /**
@@ -66,8 +69,6 @@ export const ScriptResultRenderer: React.FC<ScriptResultRendererProps> = ({ pane
   // Exit code styling
   const isError = exitCode !== 0 && exitCode !== undefined;
   const hasOutput = stdout || stderr;
-
-
 
   return (
     <div className="space-y-4">
@@ -129,7 +130,7 @@ export const ScriptResultRenderer: React.FC<ScriptResultRendererProps> = ({ pane
           {/* Professional code editor */}
           <CodeEditor
             code={script || ''}
-            fileName={`script.${LANGUAGE_EXTENSIONS[getLanguageFromInterpreter(interpreter)]}`}
+            fileName={`script.${LANGUAGE_EXTENSIONS[getLanguageFromInterpreter(interpreter)] || 'txt'}`}
             showLineNumbers={true}
             maxHeight={displayMode === 'both' ? '40vh' : '80vh'}
           />
@@ -144,20 +145,20 @@ export const ScriptResultRenderer: React.FC<ScriptResultRendererProps> = ({ pane
           transition={{ delay: displayMode === 'both' ? 0.1 : 0 }}
         >
           <TerminalOutput
-            title={(
+            title={
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <FiPlay size={10} />
                 <span>Script Execution - {interpreter}</span>
               </div>
-            )}
-            command={(
+            }
+            command={
               <>
                 {highlightCommand(`${interpreter} << 'EOF'`)}
                 <div className="mt-2">
                   <span className="text-gray-500 text-xs">EOF</span>
                 </div>
               </>
-            )}
+            }
             stdout={stdout}
             stderr={stderr}
             exitCode={exitCode}
